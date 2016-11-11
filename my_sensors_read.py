@@ -8,6 +8,8 @@ import socket
 import sys
 import json
 
+need_to_synchronize = False
+
 
 def read_from_sensors():
     # initialize GPIO
@@ -27,18 +29,15 @@ def read_from_sensors():
         if result.is_valid():
             temp_results.append([result.temperature, result.humidity]) # TODO: dokladac rowniez tu z pylow analigicznie gdy jest valid...
             print("Last valid input: " + str(datetime.datetime.now()))
-        # every minute average and send data
+        # every minute average results from sensors and send data
         if datetime.datetime.now().second == 0:
             write_and_send(temp_results)
             temp_results = []
-            # every minute try to synchronize database (send those "not send" records)
-            if datetime.datetime.now().minute == 0:
-                synchronize()
         time.sleep(1)
 
 
 def average(temp_results):
-    avg_datetime = datetime.datetime.now().replace(second = 0, microsecond = 0, minute = datetime.datetime.now().minute-1)  # results from previous minute
+    avg_datetime = datetime.datetime.now().replace(second = 0, microsecond = 0, minute = (datetime.datetime.now().minute-1)%60)  # results from previous minute
     if len(temp_results) == 0:
         print("No results!")
         return avg_datetime, '', ''
@@ -74,16 +73,21 @@ def write_and_send(temp_results):
         s.send(json.dumps(data))
         print("Done sending")
         data['send'] = 'YES'
+        # if sending was successful and there is unsend data, then try to synchronize databases
+        if need_to_synchronize:
+            synchronize()
     except socket.error:
         print("Unable to connect to", host)
         data['send'] = 'NO'
+        need_to_synchronize = True
     # write data to csv backup copy with correct flag (data send or not send)
     with open('results.csv', 'a') as csvfile:
         fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed', 'pressure', 'send']
-        writer = csv.DictWriter(csvfile, fieldnames = fieldnames)
-        writer.writeheader()
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        # writer.writeheader()
         writer.writerow(data)
     print(data)
+    print(need_to_synchronize)
 
 
 def synchronize():
@@ -91,7 +95,8 @@ def synchronize():
     port = 8888
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     with open('results.csv', 'a') as csvfile:
-        reader = csv.DictWriter(csvfile)
+        fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed', 'pressure', 'send']
+        reader = csv.DictWriter(csvfile, fieldnames=fieldnames)
         for row in reader:
             if row['send'] == 'NO':
                 try:
@@ -102,6 +107,8 @@ def synchronize():
                     row['send'] = 'YES'
                 except socket.error:
                     print("Unable to connect to", host)
+                    return
+    need_to_synchronize = False
     
 
 if __name__ == "__main__":
