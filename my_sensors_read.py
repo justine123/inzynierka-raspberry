@@ -8,21 +8,20 @@ import socket
 import sys
 import json
 
-need_to_synchronize = False
-
+#need_to_synchronize = False
 
 def read_from_sensors():
     # initialize GPIO
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     GPIO.cleanup()
-
-    # read data using pin 4
+    # read data from DHT11 sensor using pin 4
     instance = dht11.DHT11(pin=4)
     temp_results = []
     results = []
-    
+
     print("Start!")
+    
     while True:
         result = instance.read()
         # TODO: rowniez odczyt z czujnika pylow co 1s
@@ -48,12 +47,16 @@ def average(temp_results):
 
 
 def get_weather_data():
-    owm = pyowm.OWM('e4fde90e6d809209411d7c680e9e52d7')
-    observation = owm.weather_at_place('Cracov, pl')
-    w = observation.get_weather()
-    wind = w.get_wind()
-    pressure = w.get_pressure()
-    return wind, pressure
+    try:
+        owm = pyowm.OWM('e4fde90e6d809209411d7c680e9e52d7')
+        observation = owm.weather_at_place('Cracov, pl')
+        w = observation.get_weather()
+        wind = w.get_wind()
+        pressure = w.get_pressure()
+    except socket.error:
+        wind = {'deg': '', 'speed': ''}
+        pressure = {'press': ''}
+    return wind, pressure   
 
 
 def write_and_send(temp_results):
@@ -72,14 +75,14 @@ def write_and_send(temp_results):
         print("Connected, about to send")
         s.send(json.dumps(data))
         print("Done sending")
-        data['send'] = 'YES'
+        data['send'] = 'NO'
         # if sending was successful and there is unsend data, then try to synchronize databases
-        if need_to_synchronize:
-            synchronize()
+        #if need_to_synchronize:
+            #synchronize()
     except socket.error:
         print("Unable to connect to", host)
         data['send'] = 'NO'
-        need_to_synchronize = True
+        #need_to_synchronize = True
     # write data to csv backup copy with correct flag (data send or not send)
     with open('results.csv', 'a') as csvfile:
         fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed', 'pressure', 'send']
@@ -87,28 +90,33 @@ def write_and_send(temp_results):
         # writer.writeheader()
         writer.writerow(data)
     print(data)
-    print(need_to_synchronize)
+    #print(need_to_synchronize)
 
 
 def synchronize():
     host = "192.168.137.1"
     port = 8888
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    with open('results.csv', 'a') as csvfile:
+    with open('results.csv', 'rw') as csvfile:
         fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed', 'pressure', 'send']
-        reader = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        for row in reader:
-            if row['send'] == 'NO':
-                try:
-                    s.connect((host, port))
-                    print("Connected, about to send")
-                    s.send(json.dumps(row))
-                    print("Done sending")
-                    row['send'] = 'YES'
-                except socket.error:
-                    print("Unable to connect to", host)
-                    return
-    need_to_synchronize = False
+        reader = csv.DictReader(csvfile, fieldnames=fieldnames)
+        try:
+            s.connect((host, port))
+            for row in reader:
+                if row['send'] == 'NO':
+                    try:
+                        s.send(json.dumps(row))
+                        print("Done sending")
+                        row['send'] = 'YES'
+                        print(row)
+                        time.sleep(10)
+                    except socket.error:
+                        print("Unable to send data")
+                        return
+        except socket.error:
+                print("Unable to connect to", host)
+                return
+    #need_to_synchronize = False
     
 
 if __name__ == "__main__":
