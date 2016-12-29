@@ -4,13 +4,13 @@ import json
 import socket
 import sys
 import time
-import serial
 
 import RPi.GPIO as GPIO
 import pyowm
 from DHT11_Python import dht11
 
-#need_to_synchronize = False
+need_to_synchronize = False
+
 
 def read_from_sensors():
     print("Start!")
@@ -19,20 +19,10 @@ def read_from_sensors():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     GPIO.cleanup()
-<<<<<<< HEAD
     instance = dht11.DHT11(pin=4)  # read data from DHT11 sensor using pin 4
     schar = 0x4d42
     port = serial.Serial("/dev/ttyAMA0", baudrate=9600, timeout=5.0)  # serial port for dust sensor
 
-=======
-    # read data from DHT11 sensor using pin 4
-    instance = dht11.DHT11(pin=4)
-    temp_results = []
-    results = []
-
-    print("Start!")
-    
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
     while True:
         result = instance.read()
         pm25 = ''
@@ -61,7 +51,7 @@ def read_from_sensors():
                     port.flushInput()
                     print("Read 1 error")
         except (KeyboardInterrupt, SystemExit):
-            port.close() """
+            port.close()"""
 
         if result.is_valid():
             temp_results.append([result.temperature, result.humidity, pm25, pm10])
@@ -69,12 +59,12 @@ def read_from_sensors():
 
         # every minute average results from sensors and send data in separate thread
         if datetime.datetime.now().second == 0:
-            #try:
-             #   w_s = os.pipe()
-              #  thread.start_new_thread(write_and_send, ("Thread-1", w_s,))
-               # threading.Thread(target=write_and_send, args=(temp_results,)).start()
-            #except:
-             #   print("Error: unable to start thread")
+            """try:
+                w_s = os.pipe()
+                thread.start_new_thread(write_and_send, ("Thread-1", w_s,))
+                threading.Thread(target=write_and_send, args=(temp_results,)).start()
+            except:
+                print("Error: unable to start thread")"""
             write_and_send(temp_results)
             temp_results = []
         time.sleep(1)
@@ -104,11 +94,7 @@ def get_weather_data():
     except socket.error:
         wind = {'deg': '', 'speed': ''}
         pressure = {'press': ''}
-<<<<<<< HEAD
     return wind, pressure
-=======
-    return wind, pressure   
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
 
 
 def write_and_send(temp_results):
@@ -130,47 +116,30 @@ def write_and_send(temp_results):
         print("Connected, about to send")
         s.send(json.dumps(data))
         print("Done sending")
-<<<<<<< HEAD
         data['send'] = 'YES'
 
         # if sending was successful and there is unsend data, then try to synchronize databases
         if need_to_synchronize:
-           # try:
-            #    synch = os.pipe()
-             #   thread.start_new_thread(synchronize, ("Thread-1", synch,))
-              #  threading.Thread(target=synchronize).start()
-            #except:
-             #   print("Error: unable to start thread")
+            """try:
+                synch = os.pipe()
+                thread.start_new_thread(synchronize, ("Thread-1", synch,))
+                threading.Thread(target=synchronize).start()
+            except:
+                print("Error: unable to start thread")"""
             synchronize()
-=======
-        data['send'] = 'NO'
-        # if sending was successful and there is unsend data, then try to synchronize databases
-        #if need_to_synchronize:
-            #synchronize()
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
     except socket.error:
-        print("Unable to connect to " + host)
+        print("Unable to connect to", host)
         data['send'] = 'NO'
-<<<<<<< HEAD
         need_to_synchronize = True
 
-=======
-        #need_to_synchronize = True
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
     # write data to csv backup copy with correct flag (data send or not send)
     with open('results.csv', 'a') as csvfile:
         fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed',
                       'pressure', 'send']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writerow(data)
-    print("Data: ")
     print(data)
-<<<<<<< HEAD
-    print("Need to synchronize: ")
     print(need_to_synchronize)
-=======
-    #print(need_to_synchronize)
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
 
 
 def synchronize():
@@ -179,12 +148,8 @@ def synchronize():
     port = 8888
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     with open('results.csv', 'rw') as csvfile:
-<<<<<<< HEAD
         fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed',
                       'pressure', 'send']
-=======
-        fieldnames = ['sensor_id', 'date', 'temperature', 'humidity', 'pm2.5', 'pm10', 'wind_direction', 'wind_speed', 'pressure', 'send']
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
         reader = csv.DictReader(csvfile, fieldnames=fieldnames)
         try:
             s.connect((host, port))
@@ -199,25 +164,17 @@ def synchronize():
                     except socket.error:
                         print("Unable to send data")
                         return
-<<<<<<< HEAD
             need_to_synchronize = False
         except socket.error:
             print("Unable to connect to", host)
             return
 
-=======
-        except socket.error:
-                print("Unable to connect to", host)
-                return
-    #need_to_synchronize = False
-    
->>>>>>> 7cdd1690b8cd3559ae232ec3718778997c414732
 
 if __name__ == "__main__":
-    #try:
-     #   r_s = os.pipe()
-      #  thread.start_new_thread(read_from_sensors)
-        #threading.Thread(target=read_from_sensors).start()
-   # except:
-       # print("Error: unable to start read_from_sensors thread")
+    """try:
+        r_s = os.pipe()
+        thread.start_new_thread(read_from_sensors, ("Thread-1", r_s,))
+        threading.Thread(target=read_from_sensors).start()
+    except:
+        print("Error: unable to start thread")"""
     read_from_sensors()
